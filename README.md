@@ -8,7 +8,9 @@ and phone screens.
 
 - **Secure two-person login** — accounts are created with a private invite
   code, passwords are bcrypt-hashed, and access is via short-lived JWTs.
-  Each person only sees their own entries.
+  The first account to register becomes the admin and approves later
+  sign-ups. Both partners share the same calendar and entries, with roles
+  controlling who can edit (admin/user) versus view only (read-only).
 - **Fast tracking** — add a feed, sleep, or diaper in a couple of taps; edit
   or delete any entry from the day panel. Sleep entries can be left open
   ("still sleeping") and the summary counts them up to the present. Diaper
@@ -43,7 +45,8 @@ docker compose up --build
 Then open http://localhost:8080.
 
 - **Register** your first account (you) with the invite code from `.env`
-  (`bumblebee` by default). Register again as your wife. Only people who know
+  (`bumblebee` by default). That account is the admin. Register again as your
+  wife, then approve her account from the Admin page. Only people who know
   the invite code can create accounts.
 - **Log in** to see the calendar. Click any day to view and add entries.
 - The backend API is also available directly at http://localhost:8000/api
@@ -98,3 +101,26 @@ for drift with `compare_type`, so column type changes are picked up too.
 The initial migration (`0001_initial.py`) is safe to apply on a database that
 was previously created by the old `create_all` startup — it skips tables that
 already exist.
+
+## Testing
+
+Backend tests use pytest against a disposable Postgres database:
+
+```bash
+cd backend
+python -m venv .venv && . .venv/bin/activate
+pip install -r requirements-dev.txt
+pytest
+```
+
+Frontend tests use Vitest and React Testing Library:
+
+```bash
+cd frontend
+npm install
+npm test
+```
+
+The GitHub Actions workflow (`.github/workflows/ci.yml`) runs both suites on
+every push and pull request, then builds and pushes the `backend` and
+`frontend` container images to GitHub Container Registry.
