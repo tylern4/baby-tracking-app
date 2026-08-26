@@ -41,7 +41,7 @@ function entrySub(entry: Entry): string {
       return formatMinutes(minutes)
     }
     case 'diaper': {
-      const color = getDiaperColor(String(d.color ?? ''))
+      const color = d.dirty ? getDiaperColor(String(d.color ?? '')) : undefined
       const parts: string[] = []
       if (color) parts.push(color.label)
       if (d.wet) parts.push('Wet')
@@ -81,7 +81,7 @@ export function DayPanel({ date, entries, loading, canEdit, onAdd, onEdit }: Pro
           const Icon = ICONS[entry.type]
           const start = new Date(entry.started_at)
           const diaperColor =
-            entry.type === 'diaper'
+            entry.type === 'diaper' && entry.details.dirty
               ? getDiaperColor(String(entry.details.color ?? ''))
               : undefined
           return (

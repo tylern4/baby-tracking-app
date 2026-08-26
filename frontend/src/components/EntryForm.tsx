@@ -254,28 +254,30 @@ export function EntryForm({ open, entry, defaultDate, onClose, onSaved }: Props)
 
           {type === 'diaper' && (
             <>
-              <div className="field">
-                <label>Color</label>
-                <div className="color-swatches">
-                  {DIAPER_COLORS.map((c) => (
-                    <button
-                      key={c.key}
-                      type="button"
-                      className={`swatch${color === c.key ? ' selected' : ''}`}
-                      style={{ backgroundColor: c.hex }}
-                      onClick={() => setColor(c.key)}
-                      title={c.label}
-                      aria-label={c.label}
-                    />
-                  ))}
+              {dirty && (
+                <div className="field">
+                  <label>Color</label>
+                  <div className="color-swatches">
+                    {DIAPER_COLORS.map((c) => (
+                      <button
+                        key={c.key}
+                        type="button"
+                        className={`swatch${color === c.key ? ' selected' : ''}`}
+                        style={{ backgroundColor: c.hex }}
+                        onClick={() => setColor(c.key)}
+                        title={c.label}
+                        aria-label={c.label}
+                      />
+                    ))}
+                  </div>
+                  {getDiaperColor(color) && (
+                    <span className="selected-color">
+                      <span className="diaper-dot" style={{ backgroundColor: getDiaperColor(color)!.hex }} />
+                      {getDiaperColor(color)!.label}
+                    </span>
+                  )}
                 </div>
-                {getDiaperColor(color) && (
-                  <span className="selected-color">
-                    <span className="diaper-dot" style={{ backgroundColor: getDiaperColor(color)!.hex }} />
-                    {getDiaperColor(color)!.label}
-                  </span>
-                )}
-              </div>
+              )}
               <div className="checkbox-row">
                 <label>
                   <input type="checkbox" checked={wet} onChange={(e) => setWet(e.target.checked)} /> Wet

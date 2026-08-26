@@ -72,7 +72,27 @@ describe('DayPanel', () => {
     expect(screen.getByText(/· Feed/)).toBeInTheDocument()
     expect(screen.getByText(/90 ml · bottle/)).toBeInTheDocument()
     expect(screen.getByText(/2h 15m/)).toBeInTheDocument()
-    expect(screen.getByText(/Green · Wet/)).toBeInTheDocument()
+    expect(screen.getByText(/Wet/)).toBeInTheDocument()
+  })
+
+  it('shows the diaper color only when the diaper is dirty', () => {
+    const { rerender } = renderPanel()
+    expect(screen.queryByText(/Green/)).not.toBeInTheDocument()
+    const dirtyDiaper: Entry = {
+      ...entries[2],
+      details: { color: 'green', wet: false, dirty: true },
+    }
+    rerender(
+      <DayPanel
+        date={date}
+        entries={[dirtyDiaper]}
+        loading={false}
+        canEdit
+        onAdd={vi.fn()}
+        onEdit={vi.fn()}
+      />,
+    )
+    expect(screen.getByText(/Green · Dirty/)).toBeInTheDocument()
   })
 
   it('shows sleeping state when the end is before the start', () => {
