@@ -4,10 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ..auth import get_admin_user
+from ..auth import get_admin_user, hash_password
 from ..database import get_db
 from ..models import Role, User, UserStatus
-from ..schemas import RoleUpdate, UserAdminOut
+from ..schemas import PasswordReset, RoleUpdate, UserAdminOut
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -73,6 +73,20 @@ def set_user_role(
                 detail="Cannot demote the last admin",
             )
     user.role = payload.role
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.post("/{user_id}/reset-password", response_model=UserAdminOut)
+def reset_user_password(
+    user_id: int,
+    payload: PasswordReset,
+    admin: Annotated[User, Depends(get_admin_user)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    user = _get_user(db, user_id)
+    user.password_hash = hash_password(payload.password)
     db.commit()
     db.refresh(user)
     return user

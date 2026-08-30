@@ -95,4 +95,9 @@ export const api = {
   setUserRole: (id: number, role: Role) =>
     request<UserAdmin>(`/users/${id}/role`, { method: 'PATCH', body: JSON.stringify({ role }) }),
   deleteUser: (id: number) => request<void>(`/users/${id}`, { method: 'DELETE' }),
+  resetPassword: (id: number, password: string) =>
+    request<UserAdmin>(`/users/${id}/reset-password`, {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    }),
 }

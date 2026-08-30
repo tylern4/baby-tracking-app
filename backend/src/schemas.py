@@ -46,6 +46,10 @@ class RoleUpdate(BaseModel):
     role: Role
 
 
+class PasswordReset(BaseModel):
+    password: str = Field(min_length=8, max_length=128)
+
+
 class EntryCreate(BaseModel):
     type: EntryType
     started_at: datetime

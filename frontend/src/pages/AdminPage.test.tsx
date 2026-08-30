@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => {
     denyUser: vi.fn(),
     setUserRole: vi.fn(),
     deleteUser: vi.fn(),
+    resetPassword: vi.fn(),
   }
   const useAuth = vi.fn()
   class ApiError extends Error {
@@ -55,6 +56,12 @@ beforeEach(() => {
   mocks.api.approveUser.mockResolvedValue(users[1])
   mocks.api.denyUser.mockResolvedValue(users[1])
   mocks.api.setUserRole.mockResolvedValue(users[2])
+  mocks.api.deleteUser.mockResolvedValue(undefined)
+  mocks.api.resetPassword.mockResolvedValue(users[2])
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 describe('AdminPage', () => {
@@ -83,13 +90,102 @@ describe('AdminPage', () => {
     await waitFor(() => expect(mocks.api.setUserRole).toHaveBeenCalledWith(3, 'read_only'))
   })
 
-  it('marks the current user as self and disables their controls', async () => {
+  it('marks the current user as self and disables their role select', async () => {
     renderAdmin()
     expect(await screen.findByText('you')).toBeInTheDocument()
     const row = screen.getByText('admin@x.com').closest('.admin-row') as HTMLElement
     expect(within(row).getByRole('combobox')).toBeDisabled()
     expect(within(row).queryByRole('button', { name: 'Deny' })).not.toBeInTheDocument()
     expect(within(row).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+  })
+
+  it('shows reset password button for all users including self', async () => {
+    renderAdmin()
+    await screen.findByText('admin@x.com')
+    const buttons = screen.getAllByRole('button', { name: 'Reset password' })
+    expect(buttons).toHaveLength(3)
+  })
+
+  it('opens reset password modal and submits', async () => {
+    const user = userEvent.setup()
+    renderAdmin()
+    await screen.findByText('active@x.com')
+    const row = screen.getByText('active@x.com').closest('.admin-row') as HTMLElement
+    await user.click(within(row).getByRole('button', { name: 'Reset password' }))
+
+    expect(screen.getByText('Reset password for Active')).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('New password'), 'newpass123')
+    await user.type(screen.getByLabelText('Confirm password'), 'newpass123')
+    await user.click(within(screen.getByRole('form')).getByRole('button', { name: 'Reset password' }))
+
+    await waitFor(() => expect(mocks.api.resetPassword).toHaveBeenCalledWith(3, 'newpass123'))
+    expect(mocks.api.listUsers).toHaveBeenCalledTimes(2)
+  })
+
+  it('validates passwords match in reset modal', async () => {
+    const user = userEvent.setup()
+    renderAdmin()
+    await screen.findByText('pending@x.com')
+    const row = screen.getByText('pending@x.com').closest('.admin-row') as HTMLElement
+    await user.click(within(row).getByRole('button', { name: 'Reset password' }))
+
+    await user.type(screen.getByLabelText('New password'), 'newpass123')
+    await user.type(screen.getByLabelText('Confirm password'), 'different1')
+    await user.click(within(screen.getByRole('form')).getByRole('button', { name: 'Reset password' }))
+
+    expect(await screen.getByText('Passwords do not match.')).toBeInTheDocument()
+    expect(mocks.api.resetPassword).not.toHaveBeenCalled()
+  })
+
+  it('validates password length in reset modal', async () => {
+    const user = userEvent.setup()
+    renderAdmin()
+    await screen.findByText('pending@x.com')
+    const row = screen.getByText('pending@x.com').closest('.admin-row') as HTMLElement
+    await user.click(within(row).getByRole('button', { name: 'Reset password' }))
+
+    await user.type(screen.getByLabelText('New password'), 'short')
+    await user.type(screen.getByLabelText('Confirm password'), 'short')
+    await user.click(within(screen.getByRole('form')).getByRole('button', { name: 'Reset password' }))
+
+    expect(await screen.getByText('Password must be at least 8 characters.')).toBeInTheDocument()
+    expect(mocks.api.resetPassword).not.toHaveBeenCalled()
+  })
+
+  it('closes reset password modal on cancel', async () => {
+    const user = userEvent.setup()
+    renderAdmin()
+    await screen.findByText('pending@x.com')
+    const row = screen.getByText('pending@x.com').closest('.admin-row') as HTMLElement
+    await user.click(within(row).getByRole('button', { name: 'Reset password' }))
+
+    expect(screen.getByText('Reset password for Pending')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByText('Reset password for Pending')).not.toBeInTheDocument()
+  })
+
+  it('asks for confirmation before deleting a user', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('confirm', vi.fn(() => true))
+    renderAdmin()
+    await screen.findByText('active@x.com')
+    const row = screen.getByText('active@x.com').closest('.admin-row') as HTMLElement
+    await user.click(within(row).getByRole('button', { name: 'Delete' }))
+
+    expect(confirm).toHaveBeenCalledWith('Delete Active? This cannot be undone.')
+    await waitFor(() => expect(mocks.api.deleteUser).toHaveBeenCalledWith(3))
+  })
+
+  it('does not delete when confirmation is cancelled', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('confirm', vi.fn(() => false))
+    renderAdmin()
+    await screen.findByText('active@x.com')
+    const row = screen.getByText('active@x.com').closest('.admin-row') as HTMLElement
+    await user.click(within(row).getByRole('button', { name: 'Delete' }))
+
+    expect(mocks.api.deleteUser).not.toHaveBeenCalled()
   })
 
   it('shows an error banner when loading users fails', async () => {
