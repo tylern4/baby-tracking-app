@@ -59,20 +59,28 @@ describe('EntryForm', () => {
   it('requires a start time', async () => {
     const { container } = renderForm()
     const form = container.querySelector('form') as HTMLFormElement
-    const start = container.querySelector('input[type="datetime-local"]') as HTMLInputElement
+    const start = container.querySelector('input[type="date"]') as HTMLInputElement
     fireEvent.change(start, { target: { value: '' } })
     fireEvent.submit(form)
-    expect(screen.getByText('Start time is required.')).toBeInTheDocument()
+    expect(screen.getByText('Start date is required.')).toBeInTheDocument()
     expect(api.createEntry).not.toHaveBeenCalled()
+  })
+
+  it('offers only 15-minute increments for the minute selector', () => {
+    const { container } = renderForm()
+    const minuteSelect = container.querySelectorAll('select')[1]
+    const options = Array.from(minuteSelect.querySelectorAll('option')).map((o) => o.getAttribute('value'))
+    expect(options).toEqual(['00', '15', '30', '45'])
   })
 
   it('rejects an end time before the start time', async () => {
     const user = userEvent.setup()
     const { container } = renderForm()
     await user.click(screen.getByRole('button', { name: 'Sleep' }))
-    const inputs = container.querySelectorAll('input[type="datetime-local"]')
-    fireEvent.change(inputs[0], { target: { value: '2026-02-05T14:00' } })
-    fireEvent.change(inputs[1], { target: { value: '2026-02-05T10:00' } })
+    await user.click(screen.getByRole('button', { name: 'Add end time' }))
+    const dates = container.querySelectorAll('input[type="date"]')
+    fireEvent.change(dates[0], { target: { value: '2026-02-05' } })
+    fireEvent.change(dates[1], { target: { value: '2026-02-04' } })
     await user.click(screen.getByRole('button', { name: 'Add' }))
     expect(screen.getByText('End time must be after start time.')).toBeInTheDocument()
     expect(api.createEntry).not.toHaveBeenCalled()
@@ -101,9 +109,9 @@ describe('EntryForm', () => {
     const { container, onClose, onSaved } = renderForm({ entry: sleepEntry })
     expect(screen.getByText('Edit entry')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Sleep' })).toBeDisabled()
-    const inputs = container.querySelectorAll('input[type="datetime-local"]')
-    expect((inputs[0] as HTMLInputElement).value).toBeTruthy()
-    expect((inputs[1] as HTMLInputElement).value).toBeTruthy()
+    const dates = container.querySelectorAll('input[type="date"]')
+    expect((dates[0] as HTMLInputElement).value).toBeTruthy()
+    expect((dates[1] as HTMLInputElement).value).toBeTruthy()
     fireEvent.change(screen.getByPlaceholderText('Optional…'), { target: { value: 'new note' } })
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
     await waitFor(() =>

@@ -3,7 +3,7 @@ import type { ComponentType } from 'react'
 import { Milk, Moon, X, Trash2 } from 'lucide-react'
 import { api } from '../api'
 import type { Entry, EntryInput, EntryType } from '../types'
-import { toInputValue, parseInputValue } from '../dates'
+import { parseInputValue, roundToNearest15, toInputValue } from '../dates'
 import { DIAPER_COLORS, getDiaperColor } from '../diaperColors'
 import { DiaperIcon } from './DiaperIcon'
 
@@ -23,6 +23,77 @@ const TYPE_META: Record<EntryType, { label: string; icon: TabIcon }> = {
   diaper: { label: 'Diaper', icon: DiaperIcon },
 }
 
+const HOURS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'))
+const MINUTES = ['00', '15', '30', '45']
+
+function splitInput(value: string): { date: string; hour: string; minute: string } {
+  const [date, time] = value.split('T')
+  const [hour = '00', minute = '00'] = (time ?? ':').split(':')
+  return { date: date ?? '', hour, minute }
+}
+
+function minuteToStep(minute: string): string {
+  const m = Number(minute)
+  if (Number.isNaN(m)) return '00'
+  const within = ((Math.round(m / 15) * 15) % 60)
+  return String(within === 0 ? 0 : within).padStart(2, '0')
+}
+
+interface TimePickerProps {
+  date: string
+  hour: string
+  minute: string
+  required?: boolean
+  onDate: (v: string) => void
+  onHour: (v: string) => void
+  onMinute: (v: string) => void
+  dateLabel: string
+  hourLabel: string
+  minuteLabel: string
+}
+
+function TimePicker({
+  date,
+  hour,
+  minute,
+  required,
+  onDate,
+  onHour,
+  onMinute,
+  dateLabel,
+  hourLabel,
+  minuteLabel,
+}: TimePickerProps) {
+  return (
+    <div className="time-picker">
+      <div className="field time-date">
+        <label>{dateLabel}</label>
+        <input type="date" required={required} value={date} onChange={(e) => onDate(e.target.value)} />
+      </div>
+      <div className="field time-hour">
+        <label>{hourLabel}</label>
+        <select value={hour} onChange={(e) => onHour(e.target.value)}>
+          {HOURS.map((h) => (
+            <option key={h} value={h}>
+              {h}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="field time-minute">
+        <label>{minuteLabel}</label>
+        <select value={minute} onChange={(e) => onMinute(e.target.value)}>
+          {MINUTES.map((m) => (
+            <option key={m} value={m}>
+              :{m}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  )
+}
+
 function num(v: string): number | undefined {
   if (v === '') return undefined
   const n = Number(v)
@@ -31,8 +102,13 @@ function num(v: string): number | undefined {
 
 export function EntryForm({ open, entry, defaultDate, onClose, onSaved }: Props) {
   const [type, setType] = useState<EntryType>('feed')
-  const [startedAt, setStartedAt] = useState('')
-  const [endedAt, setEndedAt] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [startHour, setStartHour] = useState('00')
+  const [startMinute, setStartMinute] = useState('00')
+  const [hasEnd, setHasEnd] = useState(false)
+  const [endDate, setEndDate] = useState('')
+  const [endHour, setEndHour] = useState('00')
+  const [endMinute, setEndMinute] = useState('00')
   const [amountMl, setAmountMl] = useState('')
   const [durationMin, setDurationMin] = useState('')
   const [method, setMethod] = useState('bottle')
@@ -49,8 +125,22 @@ export function EntryForm({ open, entry, defaultDate, onClose, onSaved }: Props)
     setError(null)
     if (entry) {
       setType(entry.type)
-      setStartedAt(toInputValue(new Date(entry.started_at)))
-      setEndedAt(entry.ended_at ? toInputValue(new Date(entry.ended_at)) : '')
+      const s = splitInput(toInputValue(new Date(entry.started_at)))
+      setStartDate(s.date)
+      setStartHour(s.hour)
+      setStartMinute(minuteToStep(s.minute))
+      if (entry.ended_at) {
+        const e = splitInput(toInputValue(new Date(entry.ended_at)))
+        setHasEnd(true)
+        setEndDate(e.date)
+        setEndHour(e.hour)
+        setEndMinute(minuteToStep(e.minute))
+      } else {
+        setHasEnd(false)
+        setEndDate('')
+        setEndHour('00')
+        setEndMinute('00')
+      }
       setAmountMl(String((entry.details.amount_ml as number | undefined) ?? ''))
       setDurationMin(String((entry.details.duration_min as number | undefined) ?? ''))
       setMethod(String((entry.details.method as string | undefined) ?? 'bottle'))
@@ -60,11 +150,18 @@ export function EntryForm({ open, entry, defaultDate, onClose, onSaved }: Props)
       setColor(String((entry.details.color as string | undefined) ?? 'mustard'))
       setNote(entry.note ?? '')
     } else {
-      const start = new Date(defaultDate)
+      const start = roundToNearest15(new Date(defaultDate))
       start.setHours(new Date().getHours(), new Date().getMinutes(), 0, 0)
+      const rounded = roundToNearest15(start)
+      const s = splitInput(toInputValue(rounded))
       setType('feed')
-      setStartedAt(toInputValue(start))
-      setEndedAt('')
+      setStartDate(s.date)
+      setStartHour(s.hour)
+      setStartMinute(s.minute)
+      setHasEnd(false)
+      setEndDate('')
+      setEndHour('00')
+      setEndMinute('00')
       setAmountMl('')
       setDurationMin('')
       setMethod('bottle')
@@ -83,23 +180,32 @@ export function EntryForm({ open, entry, defaultDate, onClose, onSaved }: Props)
     setError(null)
   }
 
+  function buildStart(): string {
+    return `${startDate}T${startHour}:${startMinute}`
+  }
+
+  function buildEnd(): string | null {
+    if (!hasEnd) return null
+    return `${endDate}T${endHour}:${endMinute}`
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    if (!startedAt) {
-      setError('Start time is required.')
+    if (!startDate) {
+      setError('Start date is required.')
       return
     }
 
-    const start = parseInputValue(startedAt)
+    const start = parseInputValue(buildStart())
     let end: string | null = null
-    if (endedAt) {
-      const endDate = parseInputValue(endedAt)
-      if (endDate < start) {
+    if (hasEnd) {
+      const endDateParsed = parseInputValue(buildEnd() as string)
+      if (endDateParsed < start) {
         setError('End time must be after start time.')
         return
       }
-      end = endDate.toISOString()
+      end = endDateParsed.toISOString()
     }
 
     let details: Record<string, unknown> = {}
@@ -179,26 +285,43 @@ export function EntryForm({ open, entry, defaultDate, onClose, onSaved }: Props)
 
           {error && <div className="error-banner">{error}</div>}
 
-          <div className="field">
-            <label>Start</label>
-            <input
-              type="datetime-local"
-              required
-              step={900}
-              value={startedAt}
-              onChange={(e) => setStartedAt(e.target.value)}
-            />
-          </div>
+          <TimePicker
+            date={startDate}
+            hour={startHour}
+            minute={startMinute}
+            required
+            onDate={setStartDate}
+            onHour={setStartHour}
+            onMinute={setStartMinute}
+            dateLabel="Start date"
+            hourLabel="Hour"
+            minuteLabel="Minute"
+          />
 
           {type === 'sleep' && (
-            <div className="field">
-              <label>End (leave empty if still sleeping)</label>
-              <input
-                type="datetime-local"
-                step={900}
-                value={endedAt}
-                onChange={(e) => setEndedAt(e.target.value)}
-              />
+            <div className="sleep-end">
+              {hasEnd ? (
+                <>
+                  <TimePicker
+                    date={endDate}
+                    hour={endHour}
+                    minute={endMinute}
+                    onDate={setEndDate}
+                    onHour={setEndHour}
+                    onMinute={setEndMinute}
+                    dateLabel="End date"
+                    hourLabel="Hour"
+                    minuteLabel="Minute"
+                  />
+                  <button type="button" className="btn btn-sm" onClick={() => setHasEnd(false)}>
+                    Still sleeping
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="btn btn-sm" onClick={() => setHasEnd(true)}>
+                  Add end time
+                </button>
+              )}
             </div>
           )}
 

@@ -31,6 +31,14 @@ export function toInputValue(d: Date): string {
   return `${y}-${m}-${day}T${h}:${min}`
 }
 
+export function roundToNearest15(d: Date): Date {
+  const copy = new Date(d)
+  const minutes = copy.getMinutes()
+  const rounded = Math.round(minutes / 15) * 15
+  copy.setMinutes(rounded, 0, 0)
+  return copy
+}
+
 export function parseInputValue(v: string): Date {
   return new Date(v)
 }

@@ -6,6 +6,7 @@ import {
   formatMinutes,
   parseInputValue,
   parseISODate,
+  roundToNearest15,
   sleepDuration,
   startOfDay,
   toInputValue,
@@ -100,5 +101,31 @@ describe('datetime-local round trip', () => {
     expect(parsed.getFullYear()).toBe(2026)
     expect(parsed.getMonth()).toBe(1)
     expect(parsed.getDate()).toBe(5)
+  })
+})
+
+describe('roundToNearest15', () => {
+  it('rounds down below the midpoint', () => {
+    expect(roundToNearest15(new Date(2026, 1, 5, 14, 5)).getMinutes()).toBe(0)
+    expect(roundToNearest15(new Date(2026, 1, 5, 14, 7)).getMinutes()).toBe(0)
+  })
+
+  it('rounds up at and past the midpoint', () => {
+    expect(roundToNearest15(new Date(2026, 1, 5, 14, 8)).getMinutes()).toBe(15)
+    expect(roundToNearest15(new Date(2026, 1, 5, 14, 13)).getMinutes()).toBe(15)
+  })
+
+  it('aligns exact quarters', () => {
+    expect(roundToNearest15(new Date(2026, 1, 5, 14, 0)).getMinutes()).toBe(0)
+    expect(roundToNearest15(new Date(2026, 1, 5, 14, 15)).getMinutes()).toBe(15)
+    expect(roundToNearest15(new Date(2026, 1, 5, 14, 30)).getMinutes()).toBe(30)
+    expect(roundToNearest15(new Date(2026, 1, 5, 14, 45)).getMinutes()).toBe(45)
+  })
+
+  it('rolls over the hour and zeroes seconds', () => {
+    const rolled = roundToNearest15(new Date(2026, 1, 5, 14, 55))
+    expect(rolled.getHours()).toBe(15)
+    expect(rolled.getMinutes()).toBe(0)
+    expect(rolled.getSeconds()).toBe(0)
   })
 })
