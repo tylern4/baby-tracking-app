@@ -184,6 +184,7 @@ export function EntryForm({ open, entry, defaultDate, onClose, onSaved }: Props)
             <input
               type="datetime-local"
               required
+              step={900}
               value={startedAt}
               onChange={(e) => setStartedAt(e.target.value)}
             />
@@ -194,6 +195,7 @@ export function EntryForm({ open, entry, defaultDate, onClose, onSaved }: Props)
               <label>End (leave empty if still sleeping)</label>
               <input
                 type="datetime-local"
+                step={900}
                 value={endedAt}
                 onChange={(e) => setEndedAt(e.target.value)}
               />
